@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Navegação no Compose — HabitTracker</title>
+    <style>
+        :root {
+            --ink: #14171C;
+            --ink-soft: #1F242C;
+            --ink-line: #2B313B;
+            --bg: #EEF1F5;
+            --surface: #FFFFFF;
+            --line: #E2E6EB;
+            --text: #1B1E23;
+            --text-muted: #5B6470;
+            --api-color: #2D6A4F;
+            --arch-color: #2F6FED;
+            --async-color: #0D9488;
+            --fix-color: #C97A0F;
+            --code-bg: #0F1115;
+            --code-text: #D6DEE7;
+            --code-comment: #7A9F6E;
+            --focus-ring: #2F6FED;
+            --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: var(--font-sans); line-height: 1.6; margin: 0; padding: 0; background-color: var(--bg); color: var(--text); }
+        a:focus-visible, button:focus-visible, .step-nav-link:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+        .kw-nav { color: var(--api-color); font-weight: 700; }
+        .kw-arch { color: var(--arch-color); font-weight: 700; }
+        .kw-design { color: var(--async-color); font-weight: 700; }
+        strong { color: #000000; font-weight: 700; }
+        code { font-family: var(--font-mono); background: #E7EAEF; padding: 1px 6px; border-radius: 4px; font-size: 0.88em; }
+        pre code { background: none; padding: 0; border-radius: 0; font-size: inherit; color: inherit; }
+
+        header { background: var(--ink); padding: 3rem 1.2rem 2.6rem; }
+        .editor-window { max-width: 720px; margin: 0 auto; background: var(--ink-soft); border-radius: 10px; border: 1px solid var(--ink-line); overflow: hidden; }
+        .editor-titlebar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #101317; border-bottom: 1px solid var(--ink-line); }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .dot.d-nav { background: var(--api-color); }
+        .dot.d-fix { background: var(--fix-color); }
+        .dot.d-design { background: var(--async-color); }
+        .editor-titlebar .filename { margin-left: 8px; font-family: var(--font-mono); font-size: 0.8rem; color: #7D8590; }
+        .editor-body { padding: 2.2rem 2rem 2.4rem; text-align: left; }
+        .editor-body .comment-line { font-family: var(--font-mono); font-size: 0.85rem; color: var(--code-comment); margin: 0 0 1rem 0; }
+        header h1 { margin: 0; font-size: 2.1rem; letter-spacing: -0.5px; font-weight: 700; color: #EDEFF2; transform: translateZ(0); }
+        header p.subtitle { font-size: 1.05rem; color: #AEB6C2; margin: 0.7rem 0 0 0; max-width: 56ch; }
+
+        nav { background: var(--ink); padding: 0.7rem 1rem; position: sticky; top: 0; border-bottom: 1px solid var(--ink-line); z-index: 100; }
+        .nav-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: nowrap; gap: 1rem; }
+        .nav-brand { font-family: var(--font-mono); font-weight: 600; color: #7D8590; font-size: 0.85rem; white-space: nowrap; padding-top: 0.5rem; margin-right: 0.4rem; }
+        .nav-links { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+        .nav-links::-webkit-scrollbar { display: none; }
+        nav a.step-nav-link { display: inline-flex; align-items: center; gap: 6px; color: #C7CDD6; text-decoration: none; font-weight: 600; font-size: 0.84rem; white-space: nowrap; padding: 0.5rem 0.6rem; border-radius: 6px; transition: all 0.15s ease; border-bottom: 2px solid transparent; }
+        nav a.step-nav-link .nav-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.6; }
+        nav a.step-nav-link:hover { color: #FFFFFF; background: rgba(255,255,255,0.06); }
+        nav a.step-nav-link.active { color: #FFFFFF; border-bottom-color: currentColor; }
+        nav a.step-nav-link.active .nav-dot { opacity: 1; }
+        .nav-toggle { display: none; background: none; border: 1px solid var(--ink-line); color: #C7CDD6; border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 1rem; cursor: pointer; font-family: var(--font-sans); }
+
+        main { max-width: 980px; margin: 2.2rem auto; padding: 0 1.5rem; }
+        section { background: var(--surface); padding: 2.3rem 2.3rem 2.3rem 2rem; border-radius: 8px; margin-bottom: 1.6rem; border: 1px solid var(--line); border-left: 4px solid var(--text-muted); scroll-margin-top: 76px; }
+        section.acc-nav { border-left-color: var(--api-color); }
+        section.acc-design { border-left-color: var(--async-color); }
+        section.acc-fix { border-left-color: var(--fix-color); }
+        section.acc-neutral { border-left-color: #A9B1BC; }
+
+        .file-tag { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        h2 { font-size: 1.55rem; color: #14171C; margin-top: 0; margin-bottom: 1.3rem; font-weight: 700; letter-spacing: -0.3px; }
+        h3 { font-size: 1.18rem; color: #2A2E34; margin-top: 1.7rem; font-weight: 700; }
+        p, li { max-width: none; }
+
+        .flow-diagram { display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin: 1.8rem 0; padding: 1.5rem; background: #F7F9FC; border-radius: 10px; border: 1px solid var(--line); }
+        .flow-box { padding: 0.9rem 1.1rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem; text-align: center; min-width: 110px; border: 1px solid; }
+        .flow-box.a { background: #E6F5EF; color: var(--api-color); border-color: #BFE3D4; }
+        .flow-box.b { background: #EAF1FE; color: var(--arch-color); border-color: #C9DBFB; }
+        .flow-box.c { background: #E6F5F4; color: var(--async-color); border-color: #BFE3DE; }
+        .flow-arrow { font-size: 1.3rem; color: var(--text-muted); font-weight: 700; }
+        .flow-caption { width: 100%; text-align: center; font-size: 0.85rem; color: var(--text-muted); margin-top: 0.6rem; }
+
+        .data-table { width: 100%; border-collapse: collapse; margin: 1.2rem 0; font-size: 0.92rem; }
+        .data-table th, .data-table td { border: 1px solid var(--line); padding: 0.7rem 0.9rem; text-align: left; vertical-align: top; }
+        .data-table th { background: #F7F9FC; color: var(--arch-color); font-weight: 700; }
+
+        .code-container { position: relative; margin: 1.5rem 0; border-radius: 8px; overflow: hidden; }
+        .code-header { background-color: #171A1F; color: #8A93A0; padding: 0.55rem 0.9rem; font-family: var(--font-mono); font-size: 0.82rem; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .code-header .dots { display: flex; gap: 5px; }
+        .code-header .dots .dot { width: 8px; height: 8px; }
+        .code-header .fname { flex: 1; }
+        .copy-btn { background: #262B33; color: #D6DEE7; border: none; border-radius: 5px; padding: 0.25rem 0.6rem; font-size: 0.76rem; cursor: pointer; font-family: var(--font-sans); transition: background 0.15s ease; }
+        .copy-btn:hover { background: #333A44; }
+        pre { background-color: var(--code-bg); color: var(--code-text); padding: 1.4rem 1.5rem; margin: 0; overflow-x: auto; font-family: var(--font-mono); font-size: 0.85rem; }
+
+        ul { padding-left: 1.2rem; }
+        li { margin-bottom: 0.6rem; }
+
+        .step-box { background-color: #FAFBFC; border: 1px solid var(--line); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.8rem; scroll-margin-top: 76px; }
+        .step-box h3 { margin-top: 0; color: var(--text); display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.4rem; }
+        .step-progress { font-family: var(--font-mono); font-size: 0.74rem; font-weight: 600; color: var(--text-muted); background: #EEF1F5; padding: 0.2rem 0.6rem; border-radius: 4px; }
+
+        .tree-box { background: #FAFBFC; border: 1px solid var(--line); border-radius: 8px; padding: 1.3rem 1.5rem; margin: 1.2rem 0; }
+        .tree-box .tree-title { font-weight: 700; font-size: 0.92rem; margin-bottom: 0.8rem; color: var(--text); }
+        .tree-pre { background-color: var(--code-bg); color: var(--code-text); padding: 1.2rem 1.4rem; border-radius: 8px; margin: 0; overflow-x: auto; font-family: var(--font-mono); font-size: 0.84rem; line-height: 1.6; }
+
+        .checklist { background: #F3F9F6; border: 1px solid #CDE9DE; border-left: 4px solid var(--async-color); border-radius: 8px; padding: 1.5rem 1.8rem; margin-top: 1.5rem; }
+        .checklist h3 { color: #0D7A5F; margin-top: 0; }
+        .checklist ul { list-style: none; padding-left: 0; }
+        .checklist li { padding-left: 1.8rem; position: relative; }
+        .checklist li::before { content: "✓"; position: absolute; left: 0; color: #0D7A5F; font-weight: 700; }
+
+        .tip-box { background: #EAF1FE; border-left: 4px solid var(--arch-color); padding: 1rem 1.3rem; border-radius: 6px; margin: 1.2rem 0; font-size: 0.95rem; }
+        .tip-box strong { color: #14458C; }
+        .warn-box { background: #FDECEA; border-left: 4px solid #C0392B; padding: 1rem 1.3rem; border-radius: 6px; margin: 1.2rem 0; font-size: 0.95rem; }
+        .warn-box strong { color: #A31D03; }
+        .design-box { background: #E6F5F4; border-left: 4px solid var(--async-color); padding: 1rem 1.3rem; border-radius: 6px; margin: 1.2rem 0; font-size: 0.95rem; }
+        .design-box strong { color: #0D6B60; }
+
+        .erro-item { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 1.2rem; overflow: hidden; }
+        .erro-titulo { background: #FDECEA; padding: 0.8rem 1.1rem; font-family: var(--font-mono); font-size: 0.85rem; color: #A31D03; font-weight: 700; border-bottom: 1px solid var(--line); }
+        .erro-corpo { padding: 1.1rem 1.3rem; font-size: 0.95rem; }
+        .erro-corpo p { margin-top: 0; }
+        .erro-corpo p:last-child { margin-bottom: 0; }
+
+        .terminal-window { background: var(--ink-soft); border-radius: 10px; border: 1px solid var(--ink-line); overflow: hidden; }
+        .terminal-titlebar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #101317; border-bottom: 1px solid var(--ink-line); }
+        .terminal-titlebar .filename { margin-left: 8px; font-family: var(--font-mono); font-size: 0.8rem; color: #7D8590; }
+        .terminal-body { padding: 2rem 2.2rem 2.3rem; font-family: var(--font-mono); }
+        .term-line { color: #9AA4B2; margin: 0 0 0.4rem 0; font-size: 0.92rem; }
+        .term-prompt { color: var(--async-color); font-weight: 700; margin-right: 8px; }
+        .term-output { color: #C7CDD6; font-family: var(--font-sans); font-size: 0.95rem; line-height: 1.6; margin: 0.6rem 0 1.6rem 0; }
+        .term-cta { display: inline-flex; align-items: center; gap: 8px; color: var(--api-color); text-decoration: none; font-weight: 700; font-size: 1rem; padding: 0.5rem 0; border-bottom: 1px solid transparent; }
+        .term-cta:hover { border-bottom-color: var(--api-color); }
+        .cta-meta { margin-top: 1rem; font-size: 0.85rem; color: #7D8590; font-family: var(--font-sans); }
+
+        footer { text-align: center; padding: 2.6rem; background: var(--ink); color: #7D8590; font-size: 0.88rem; }
+        .cta-section { border: none; padding: 0; background: transparent; }
+
+        @media (max-width: 860px) {
+            header h1 { font-size: 1.6rem; }
+            .nav-toggle { display: inline-flex; }
+            .nav-links { display: none; width: 100%; flex-direction: column; align-items: stretch; overflow-x: visible; margin-top: 0.6rem; }
+            .nav-links.open { display: flex; }
+            .nav-inner { flex-wrap: wrap; gap: 0.4rem; }
+            .nav-brand { padding-top: 0; }
+            section { padding: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="editor-window">
+            <div class="editor-titlebar">
+                <span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span>
+                <span class="filename">habittracker/AppNavigation.kt</span>
+            </div>
+            <div class="editor-body">
+                <p class="comment-line">// guia de aula — Navigation Compose + Type-Safety + Design de Verdade</p>
+                <h1>Navegação no Compose</h1>
+                <p class="subtitle">Construindo o HabitTracker: um app com telas de verdade, navegação segura por tipos e um visual que não parece "gerado por tutorial".</p>
+            </div>
+        </div>
+    </header>
+
+    <nav>
+        <div class="nav-inner">
+            <span class="nav-brand">habittracker/</span>
+            <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navLinks">Menu</button>
+            <div class="nav-links" id="navLinks">
+                <a class="step-nav-link" href="#downloads"><span class="nav-dot"></span>O App</a>
+                <a class="step-nav-link" href="#arquitetura"><span class="nav-dot"></span>Navegação</a>
+                <a class="step-nav-link" href="#design"><span class="nav-dot"></span>Design de Verdade</a>
+                <a class="step-nav-link" href="#livecoding"><span class="nav-dot"></span>Live Coding</a>
+                <a class="step-nav-link" href="#erros"><span class="nav-dot"></span>Erros Comuns</a>
+                <a class="step-nav-link" href="#atividade-cta"><span class="nav-dot"></span>Atividade</a>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+
+        <section id="downloads" class="acc-neutral">
+            <div class="file-tag">00_projeto.md</div>
+            <h2>O Que Vamos Construir</h2>
+            <p>O <strong>HabitTracker</strong> é um app de acompanhamento de hábitos — mas o objetivo real da aula não é o hábito em si, é a <strong>estrutura de telas</strong> por trás dele, rica o suficiente para justificar quatro padrões de navegação que aparecem em praticamente todo app profissional:</p>
+            <ol>
+                <li><strong>Navegação Linear Simples</strong> — ir de uma tela para outra e voltar.</li>
+                <li><strong>Passagem de Parâmetros com Type-Safety</strong> — enviar dados de uma tela para outra com segurança de tipos, sem strings soltas.</li>
+                <li><strong>Navegação Persistente (Bottom Navigation)</strong> — alternar entre abas principais sem perder o estado.</li>
+                <li><strong>Navegação Condicional (Fluxo de Autenticação)</strong> — redirecionar o usuário para uma tela ou outra dependendo do estado dele.</li>
+            </ol>
+            <div class="tree-box">
+                <div class="tree-title">🗺️ Fluxo de telas que vamos construir</div>
+<pre class="tree-pre">[ Splash Screen ]
+      │
+      ▼ (verifica se está logado)
+      │
+  ┌───┴──────────────┐
+  ▼ não logado        ▼ logado
+[ Login Screen ]   [ Painel Principal — Bottom Navigation ]
+      │                 ├─ Aba 1: Lista de Hábitos ──▶ [ Detalhe do Hábito ]
+      ▼ (login ok)       ├─ Aba 2: Estatísticas
+[ vai para o Painel ]     └─ Aba 3: Perfil</pre>
+            </div>
+            <p style="font-size:0.9rem; color:var(--text-muted);">O <strong>Deep Linking</strong> (abrir o app direto numa tela via link externo) fica de fora por enquanto — é o padrão mais avançado dos cinco, e vale uma aula própria mais adiante.</p>
+        </section>
+
+        <section id="arquitetura" class="acc-nav">
+            <div class="file-tag">01_navegacao.md</div>
+            <h2>Por Que Navegação Precisa de uma Biblioteca</h2>
+
+            <h3>O problema: uma tela não sabe nada sobre a outra</h3>
+            <p>Em Compose, cada tela é só uma função — <code>@Composable fun TelaX()</code>. Uma função Kotlin comum não tem, por padrão, nenhuma noção de "histórico": nenhum conceito de botão Voltar, nenhuma pilha de telas visitadas, nenhuma forma de "trocar de tela" sem simplesmente chamar outra função de dentro da primeira (o que aninharia telas dentro de telas, sem nunca sair de nenhuma). É exatamente esse problema que uma biblioteca de navegação resolve: ela mantém uma <strong>pilha de destinos</strong> (o <em>back stack</em>) e decide, a cada momento, qual tela desenhar.</p>
+
+            <h3>A evolução da navegação no Android</h3>
+            <table class="data-table">
+                <thead><tr><th>Era</th><th>Como funcionava</th><th>Problema que motivou a próxima</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Multi-Activity</strong><br><small>Android clássico</small></td>
+                        <td>Cada tela era uma <code>Activity</code> separada, abertas umas sobre as outras via <code>Intent</code>.</td>
+                        <td>Cada tela carregava seu próprio ciclo de vida pesado; compartilhar estado entre telas exigia truques (extras de Intent, singletons).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Single-Activity + Fragments</strong><br><small>Navigation Component, XML</small></td>
+                        <td>Uma única Activity; um <code>NavHostFragment</code> trocava <code>Fragments</code> desenhados num grafo de navegação declarado em XML.</td>
+                        <td>Passagem de parâmetros era feita via <code>Bundle</code> — um mapa de chave/valor sem checagem de tipos em tempo de compilação. Um <code>Bundle.getString("id")</code> com o nome da chave errado só quebrava em tempo de execução.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Navigation Compose (atual)</strong></td>
+                        <td>Um único <code>NavHost</code> Composable troca funções <code>@Composable</code> como destinos; rotas são <strong>classes Kotlin</strong>, não strings soltas.</td>
+                        <td>É o estado da arte hoje — mas exige entender <em>por que</em> as rotas são tipadas, não só copiar a sintaxe.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="tip-box"><strong>Por que isso importa pra sua carreira:</strong> <span class="kw-nav">Single-Activity Architecture</span> — um app inteiro rodando dentro de uma única <code>Activity</code>, com toda a navegação acontecendo dentro dela — é a arquitetura recomendada oficialmente pelo Google desde 2018 e universal em apps Compose modernos. Se você já reparou que nosso <code>MainActivity</code> nunca muda entre as aulas, é exatamente por isso: ele só hospeda o <code>NavHost</code>, que faz o trabalho de verdade.</div>
+
+            <h3>Rotas com Type-Safety: o que isso resolve na prática</h3>
+            <p>Antes de existir suporte nativo a rotas tipadas, navegar em Compose já era possível — mas cada rota era uma <code>String</code>, tipo <code>"detalhe/{id}"</code>, e os parâmetros eram lidos de volta com <code>backStackEntry.arguments?.getInt("id")</code>. Isso tem exatamente o mesmo problema do <code>Bundle</code> do XML: se você digitar <code>"detalheHabito/{id}"</code> num lugar e <code>"detalhe_habito/{id}"</code> em outro, ou esquecer de converter o tipo, o erro só aparece com o app rodando — e às vezes nem aparece, só devolve um valor errado sem avisar nada.</p>
+            <p>Hoje, com o Navigation Compose usando classes Kotlin marcadas com <code>@Serializable</code> como rotas, o compilador garante a correspondência: se a tela de detalhe espera um <code>Int</code> chamado <code>habitoId</code>, é impossível navegar até ela passando uma <code>String</code> ou esquecendo o parâmetro — o projeto simplesmente não compila.</p>
+
+            <div class="flow-diagram">
+                <div class="flow-box a">Rota tipada<br><small>@Serializable</small></div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-box b">NavController<br><small>navigate(rota)</small></div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-box c">Tela de destino<br><small>toRoute()</small></div>
+                <div class="flow-caption">Nenhum ponto do caminho usa uma String solta — o parâmetro tem tipo do começo ao fim.</div>
+            </div>
+
+            <h3>Bottom Navigation: por que perder estado ao trocar de aba é tão ruim</h3>
+            <p>Um erro comum de quem implementa Bottom Navigation "na mão" é fazer cada clique de aba recriar a tela do zero. O sintoma: o usuário rola uma lista, troca de aba, volta — e a lista está no topo de novo, como se nada tivesse acontecido. Isso quebra uma expectativa básica de uso que o usuário nem sabe que tem, até ela ser violada.</p>
+            <p>A solução (que vamos implementar no Passo 7) é um padrão específico de três partes usadas juntas: <code>saveState = true</code> ao sair de uma aba, <code>restoreState = true</code> ao voltar pra ela, e <code>launchSingleTop = true</code> pra não empilhar a mesma aba duas vezes. É a mesma receita usada pelo Google Play, YouTube, Instagram — qualquer app com abas na base da tela.</p>
+        </section>
+
+        <section id="design" class="acc-design">
+            <div class="file-tag">02_design.md</div>
+            <h2>Design de Verdade, Não "Cara de Tutorial"</h2>
+            <p>Existe uma diferença visual reconhecível entre uma tela feita seguindo só a documentação padrão do Material3 e uma tela desenhada de propósito. Não é sobre gastar mais tempo — é sobre algumas decisões específicas, tomadas cedo.</p>
+
+            <h3>Os sinais de "tela sem intenção"</h3>
+            <table class="data-table">
+                <thead><tr><th>Sinal de tutorial</th><th>Por que acontece</th><th>O que fazer em vez disso</th></tr></thead>
+                <tbody>
+                    <tr><td>Roxo/lilás em tudo</td><td>É a cor padrão do tema Material3 quando ninguém a troca.</td><td>Definir uma paleta própria — mesmo que sejam só 3-4 cores.</td></tr>
+                    <tr><td>Cantos arredondados extremos em tudo</td><td>Copiar o exemplo mais recente sem pensar em hierarquia visual.</td><td>Usar uma escala de raio consistente (ex: 8dp para itens pequenos, 16dp para cards).</td></tr>
+                    <tr><td>Espaçamento aleatório (13dp aqui, 22dp ali)</td><td>Valores "que pareceram certos" no momento.</td><td>Uma escala fixa — múltiplos de 4dp (4, 8, 12, 16, 24, 32).</td></tr>
+                    <tr><td>Tela vazia em branco</td><td>Ninguém tratou o caso "ainda não tem dados".</td><td>Um estado vazio com texto e uma ação clara (ex: "Nenhum hábito ainda — adicione um").</td></tr>
+                    <tr><td>Ícone sem <code>contentDescription</code></td><td>Foi copiado de um exemplo que também não tinha.</td><td>Toda ação sem texto visível precisa de uma descrição para leitores de tela.</td></tr>
+                </tbody>
+            </table>
+
+            <h3>A paleta do HabitTracker</h3>
+            <p>Em vez de aceitar as cores padrão do Material3 (que sempre tendem a um roxo neutro), vamos declarar nossas próprias cores logo no Passo 3, usando <code>lightColorScheme(...)</code>. Isso não exige criar um Design System complexo — só decidir, de propósito, qual verde representa "hábito, crescimento, progresso" e usar essa mesma cor em todo lugar, em vez de cada tela inventar a própria.</p>
+
+            <div class="design-box"><strong>A regra prática:</strong> nunca escreva <code>Color(0xFF2D6A4F)</code> direto dentro de uma tela. Escreva uma vez em <code>Tema.kt</code> e use <code>MaterialTheme.colorScheme.primary</code> daí em diante. Se decidir trocar o verde por outra cor depois, muda em um lugar só — exatamente o mesmo argumento de arquitetura em camadas que já vimos com Model/ViewModel/View, agora aplicado a cor.</div>
+
+            <h3>Estados vazios e feedback: o que falta na maioria dos apps de aula</h3>
+            <p>Uma tela pronta pra produção sempre responde três perguntas, não só uma: "como fica com dados?", "como fica sem nenhum dado ainda?" e "como fica enquanto uma ação está em andamento?". No Passo 6, a lista de hábitos trata explicitamente o caso vazio — não porque é provável no dia a dia, mas porque ignorar esse caso é o jeito mais comum de uma tela "de aula" ficar visivelmente diferente de uma tela real.</p>
+
+            <div class="tip-box"><strong>Onde isso está no mercado:</strong> processos seletivos para vagas de Android/mobile frequentemente pedem, no teste técnico, para o candidato tratar estado vazio, estado de erro e acessibilidade básica — não porque sejam difíceis, mas porque são os primeiros detalhes que separam "funciona" de "está pronto para usuário real".</div>
+        </section>
+
+        <section id="livecoding" class="acc-neutral">
+            <div class="file-tag">03_livecoding/</div>
+            <h2>Live Coding Passo a Passo</h2>
+            <p>Vamos construir o HabitTracker do projeto vazio até os quatro padrões de navegação funcionando, com uma paleta própria em cada tela.</p>
+
+            <div class="step-box" id="passo-0">
+                <h3>Passo 0 — Criando e Configurando o Projeto <span class="step-progress">setup</span></h3>
+
+                <p><strong>0.1 — Criar o projeto</strong></p>
+                <ol>
+                    <li><strong>New Project</strong> → template <strong>Empty Activity</strong> (Compose).</li>
+                    <li><strong>Name:</strong> HabitTracker &nbsp;|&nbsp; <strong>Package name:</strong> <code>com.seunome.habittracker</code> &nbsp;|&nbsp; <strong>Language:</strong> Kotlin &nbsp;|&nbsp; <strong>Minimum SDK:</strong> API 24.</li>
+                    <li>Clique em <strong>Finish</strong> e aguarde o Gradle sincronizar.</li>
+                </ol>
+
+                <p><strong>0.2 — Fixar as versões (incluindo as novas deste módulo)</strong></p>
+                <p>Além do conjunto já conhecido, este módulo acrescenta duas bibliotecas: <strong>Navigation Compose</strong> (a biblioteca de navegação em si) e <strong>Kotlinx Serialization</strong> (o que permite rotas tipadas com <code>@Serializable</code>). Deixe <code>gradle/libs.versions.toml</code> assim:</p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">gradle/libs.versions.toml</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>[versions]
+agp = "8.10.0"
+kotlin = "2.0.21"
+coreKtx = "1.15.0"
+junit = "4.13.2"
+junitVersion = "1.3.0"
+espressoCore = "3.7.0"
+lifecycleRuntimeKtx = "2.8.7"
+activityCompose = "1.9.3"
+composeBom = "2024.09.00"
+navigationCompose = "2.8.0"
+kotlinxSerializationJson = "1.7.3"
+
+[libraries]
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }</code></pre>
+                </div>
+
+                                <p><strong>0.3 — Configurar o build.gradle.kts da raiz do projeto</strong></p>
+                <p>No painel <strong>Project</strong>, mude a visão para <strong>Android</strong> e abra <strong>Gradle Scripts &gt; build.gradle.kts (Project: HabitTracker)</strong> — o arquivo que fica na <strong>raiz</strong> do projeto (não o do módulo <code>:app</code>). Substitua o conteúdo por:</p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">build.gradle.kts (Project: HabitTracker)</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>// Top-level build file where you can add configuration options common to all sub-projects/modules.
+plugins {
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
+}</code></pre>
+                </div>
+                <div class="tip-box"><strong>Por que <code>apply false</code>?</strong> Na raiz, os plugins só são <em>declarados</em> (o Gradle os carrega uma vez, com a versão do catálogo). Quem de fato os <em>aplica</em> é cada módulo, com o <code>alias(...)</code> sem <code>apply false</code> — que é o que faremos no <code>:app</code> no próximo passo. Note a linha <code>kotlin.serialization</code>: ela precisa estar nos dois arquivos.</div>
+
+                <p><strong>0.4 — Configurar o módulo :app</strong></p>
+                <p>Substitua o conteúdo de <code>build.gradle.kts (Module :app)</code> por este (o plugin de serialização e as duas dependências novas já estão incluídos):</p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">build.gradle.kts (Module :app)</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+}
+
+android {
+    namespace = "com.seunome.habittracker"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.seunome.habittracker"
+        minSdk = 24
+        targetSdk = 35
+        versionCode = 1
+        versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    buildFeatures {
+        compose = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
+    }
+}
+
+dependencies {
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+}</code></pre>
+                </div>
+                <div class="warn-box"><strong>Troque <code>seunome</code> pelo seu pacote real!</strong> As linhas <code>namespace</code> e <code>applicationId</code> acima (e todos os <code>package</code>/<code>import com.seunome...</code> das próximas telas) devem usar <strong>exatamente</strong> o pacote que você escolheu ao criar o projeto — por exemplo, <code>com.rclepf.habittracker</code>. Se o <code>namespace</code> for diferente do pacote onde está o <code>MainActivity.kt</code>, o app compila mas fecha ao abrir.</div>
+                <div class="tip-box"><strong>Para que serve o bloco <code>kotlin { compilerOptions }</code>?</strong> O Kotlin usa por padrão a versão do JDK que roda o Gradle (no Android Studio recente, o 21), enquanto o <code>compileOptions</code> acima manda o Java compilar para 11. Os dois precisam concordar, senão o build falha com "Inconsistent JVM-target compatibility". Esse bloco alinha o Kotlin ao Java 11.</div>
+                <div class="warn-box"><strong>Sem o plugin <code>kotlin.serialization</code>, nada de rota tipada funciona.</strong> É ele que gera, por trás dos panos, o código capaz de serializar/desserializar as classes marcadas com <code>@Serializable</code>. Esquecê-lo é a causa do erro mais comum deste módulo — veja em <a href="#erros">Erros Comuns</a>.</div>
+
+                                <p><strong>0.5 — Conferir o gradle.properties</strong></p>
+                <p>Abra <strong>Gradle Scripts &gt; gradle.properties (Project Properties)</strong> e confirme que estas linhas existem (se o projeto foi criado como "No Activity" ou copiado de outro, elas podem faltar):</p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">gradle.properties (Project Properties)</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+kotlin.code.style=official
+android.nonTransitiveRClass=true</code></pre>
+                </div>
+                <div class="warn-box"><strong>Faltou <code>android.useAndroidX=true</code>?</strong> O build falha com "Configuration :app:debugRuntimeClasspath contains AndroidX dependencies, but the android.useAndroidX property is not enabled". Adicione a linha, clique em <strong>Sync Now</strong> e rode de novo.</div>
+
+                <p><strong>0.6 — Criar os pacotes</strong></p>
+                <p>No painel <strong>Project</strong>, clique com o botão direito em <code>com.seunome.habittracker</code> → <strong>New &gt; Package</strong> — crie <code>model</code>, <code>viewmodel</code> e <code>userinterface</code>.</p>
+                <div class="tip-box"><strong>Por que <code>userinterface</code> e não <code>ui</code>?</strong> O template já cria um pacote <code>ui</code> sozinho (com <code>ui/theme</code> dentro). Usando um nome diferente pra guardar nossas telas, evitamos qualquer fusão confusa de pastas no painel do Android Studio.</div>
+            </div>
+
+            <div class="tree-box">
+                <div class="tree-title">🗂️ Mapa de Pastas — como o projeto vai ficar</div>
+<pre class="tree-pre">app
+ └─ java
+     └─ com.seunome.habittracker
+          ├─ model
+          │    ├─ Habito.kt              (Passo 1)
+          │    └─ Rota.kt                (Passo 1)
+          ├─ viewmodel
+          │    └─ HabitoViewModel.kt      (Passo 2)
+          ├─ userinterface
+          │    ├─ Tema.kt                 (Passo 3)
+          │    ├─ SplashScreen.kt         (Passo 4)
+          │    ├─ LoginScreen.kt          (Passo 5)
+          │    ├─ ListaHabitosScreen.kt   (Passo 6)
+          │    ├─ DetalheHabitoScreen.kt  (Passo 6)
+          │    ├─ EstatisticasScreen.kt   (Passo 7)
+          │    ├─ PerfilScreen.kt         (Passo 7)
+          │    ├─ PainelPrincipal.kt      (Passo 7)
+          │    └─ AppNavigation.kt        (Passo 8)
+          ├─ ui.theme                     (já existe — não mexer)
+          └─ MainActivity.kt              (Passo 9)</pre>
+            </div>
+
+            <div class="step-box" id="passo-1">
+                <h3>Passo 1 — Modelo: Hábito e Rotas <span class="step-progress">1 de 9</span></h3>
+                <p><strong>Local:</strong> pacote <code>model</code></p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">model/Habito.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.model
+
+data class Habito(
+    val id: Int,
+    val nome: String,
+    val emoji: String,
+    val meta: String,
+    val concluidoHoje: Boolean = false
+)</code></pre>
+                </div>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">model/Rota.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.model
+
+import kotlinx.serialization.Serializable
+
+sealed interface Rota {
+    @Serializable
+    data object Splash : Rota
+
+    @Serializable
+    data object Login : Rota
+
+    @Serializable
+    data object ListaHabitos : Rota
+
+    @Serializable
+    data object Estatisticas : Rota
+
+    @Serializable
+    data object Perfil : Rota
+
+    @Serializable
+    data class DetalheHabito(val habitoId: Int) : Rota
+}</code></pre>
+                </div>
+                <div class="tip-box"><strong>Por que uma <code>sealed interface</code> agrupando as rotas?</strong> Não é obrigatório — cada rota poderia ser uma classe solta. Mas agrupá-las deixa explícito, num só lugar, quais são <em>todos</em> os destinos possíveis do app. É o mesmo raciocínio da <code>sealed interface</code> de estados de tela que já usamos antes, aplicado agora a "para onde o app pode navegar".</div>
+                <div class="tip-box"><strong><code>data object</code> vs <code>data class</code>:</strong> rotas sem parâmetro (<code>Splash</code>, <code>Login</code>...) são <code>data object</code> — só existe uma instância, não faz sentido criar várias. <code>DetalheHabito</code> é <code>data class</code> porque cada navegação até ela carrega um <code>habitoId</code> diferente.</div>
+            </div>
+
+            <div class="step-box" id="passo-2">
+                <h3>Passo 2 — ViewModel: Estado Compartilhado <span class="step-progress">2 de 9</span></h3>
+                <p><strong>Local:</strong> pacote <code>viewmodel</code> &nbsp;|&nbsp; <strong>Arquivo:</strong> <code>HabitoViewModel.kt</code></p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">viewmodel/HabitoViewModel.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.viewmodel
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import com.seunome.habittracker.model.Habito
+
+class HabitoViewModel : ViewModel() {
+
+    var estaLogado by mutableStateOf(false)
+        private set
+
+    val habitos = mutableStateListOf(
+        Habito(1, "Beber água", "💧", "8 copos por dia"),
+        Habito(2, "Ler", "📚", "20 páginas por dia"),
+        Habito(3, "Exercício", "🏃", "30 minutos por dia"),
+        Habito(4, "Meditar", "🧘", "10 minutos por dia"),
+    )
+
+    fun fazerLogin() {
+        estaLogado = true
+    }
+
+    fun fazerLogout() {
+        estaLogado = false
+    }
+
+    fun alternarConclusao(habitoId: Int) {
+        val index = habitos.indexOfFirst { it.id == habitoId }
+        if (index != -1) {
+            habitos[index] = habitos[index].copy(concluidoHoje = !habitos[index].concluidoHoje)
+        }
+    }
+
+    fun buscarHabito(habitoId: Int): Habito? =
+        habitos.find { it.id == habitoId }
+}</code></pre>
+                </div>
+                <div class="tip-box"><strong>Uma única instância pra todo o app:</strong> vamos criar este ViewModel <em>uma vez</em>, no Passo 8, e passá-lo como parâmetro pra cada tela — em vez de cada tela chamar <code>viewModel()</code> por conta própria. É essa instância única que faz o estado de login e a lista de hábitos sobreviverem intactos entre Splash, Login, e as três abas do Painel Principal.</div>
+                <div class="tip-box"><strong>Por que <code>mutableStateListOf</code> e não uma <code>List</code> comum:</strong> uma <code>List</code> do Kotlin é imutável — trocar seu conteúdo exigiria recriar a lista inteira e reatribuir a variável. <code>mutableStateListOf</code> é uma lista observável pelo Compose: alterar um item específico (como em <code>alternarConclusao</code>) já dispara a recomposição sozinho, sem precisar recriar a lista toda.</div>
+            </div>
+
+            <div class="step-box" id="passo-3">
+                <h3>Passo 3 — Tema: Uma Paleta de Verdade <span class="step-progress">3 de 9</span></h3>
+                <p><strong>Local:</strong> pacote <code>userinterface</code> &nbsp;|&nbsp; <strong>Arquivo:</strong> <code>Tema.kt</code></p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">userinterface/Tema.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.userinterface
+
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+
+private val CoresHabitTracker = lightColorScheme(
+    primary = Color(0xFF2D6A4F),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFD8F0E1),
+    onPrimaryContainer = Color(0xFF0B3D25),
+    secondary = Color(0xFF52796F),
+    background = Color(0xFFF8FAF9),
+    surface = Color.White,
+    surfaceVariant = Color(0xFFEFF3F1),
+)
+
+@Composable
+fun HabitTrackerTheme(content: @Composable () -> Unit) {
+    MaterialTheme(colorScheme = CoresHabitTracker, content = content)
+}</code></pre>
+                </div>
+                <div class="design-box"><strong>Por que uma função própria (<code>HabitTrackerTheme</code>) em vez do tema gerado pelo template:</strong> o tema que o Android Studio cria sozinho recebe um nome baseado no nome do projeto (algo como <code>HabitTrackerTheme</code> ou <code>MinhaAppTheme</code>, dependendo de como você nomeou no Passo 0.1) — o que já causou dor de cabeça em módulos anteriores quando o nome não batia. Escrever a nossa própria função, com nome que a gente escolhe, evita esse problema de vez — e ainda deixa a paleta 100% sob nosso controle.</div>
+            </div>
+
+            <div class="step-box" id="passo-4">
+                <h3>Passo 4 — Splash: Navegação Linear e Condicional <span class="step-progress">4 de 9</span></h3>
+                <p><strong>Local:</strong> pacote <code>userinterface</code> &nbsp;|&nbsp; <strong>Arquivo:</strong> <code>SplashScreen.kt</code></p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">userinterface/SplashScreen.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.userinterface
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+
+@Composable
+fun SplashScreen(estaLogado: Boolean, aoTerminarVerificacao: (Boolean) -> Unit) {
+    LaunchedEffect(Unit) {
+        delay(1200) // simula uma checagem de sessão salva
+        aoTerminarVerificacao(estaLogado)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.primary),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("🔥", fontSize = 48.sp)
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "HabitTracker",
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 26.sp
+            )
+            Spacer(Modifier.height(24.dp))
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
+        }
+    }
+}</code></pre>
+                </div>
+                <div class="tip-box"><strong>Onde estão os dois padrões de navegação neste passo:</strong> a <em>Splash</em> em si é <span class="kw-nav">Navegação Linear</span> — ela sempre leva a algum outro lugar, sem interação do usuário. Mas o <em>destino</em> dela depende de <code>estaLogado</code>: isso é <span class="kw-nav">Navegação Condicional</span>. A decisão de qual rota usar (<code>Login</code> ou <code>ListaHabitos</code>) não fica dentro da tela — ela só avisa "terminei de verificar, o resultado foi este" através do callback. Quem decide pra onde ir é o <code>AppNavigation</code>, no Passo 8. Essa separação é o mesmo princípio de sempre: a tela não sabe navegar, ela só informa o que aconteceu.</div>
+                <div class="tip-box"><strong><code>LaunchedEffect(Unit)</code>:</strong> executa o bloco uma única vez, quando a tela aparece pela primeira vez — não a cada recomposição. É o jeito correto de disparar uma ação assíncrona (como o <code>delay</code> simulando uma checagem) a partir de um Composable.</div>
+            </div>
+
+            <div class="step-box" id="passo-5">
+                <h3>Passo 5 — Login <span class="step-progress">5 de 9</span></h3>
+                <p><strong>Local:</strong> pacote <code>userinterface</code> &nbsp;|&nbsp; <strong>Arquivo:</strong> <code>LoginScreen.kt</code></p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">userinterface/LoginScreen.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.userinterface
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+
+@Composable
+fun LoginScreen(aoLogar: () -> Unit) {
+    var email by remember { mutableStateOf("") }
+    var senha by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Bem-vindo de volta", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text("Entre para continuar seus hábitos", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(32.dp))
+
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("E-mail") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = senha,
+            onValueChange = { senha = it },
+            label = { Text("Senha") },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(24.dp))
+        Button(
+            onClick = aoLogar,
+            modifier = Modifier.fillMaxWidth().height(50.dp)
+        ) {
+            Text("Entrar")
+        }
+    }
+}</code></pre>
+                </div>
+                <div class="tip-box"><strong>Sem validação de propósito:</strong> este login é falso — qualquer clique em "Entrar" funciona. O objetivo da aula é o padrão de navegação, não autenticação real (isso ficaria a cargo de um Firebase Auth ou backend próprio, fora do escopo de hoje).</div>
+            </div>
+
+            <div class="step-box" id="passo-6">
+                <h3>Passo 6 — Lista e Detalhe: Parâmetros com Type-Safety <span class="step-progress">6 de 9</span></h3>
+                <p><strong>Local:</strong> pacote <code>userinterface</code></p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">userinterface/ListaHabitosScreen.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.userinterface
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.seunome.habittracker.model.Habito
+import com.seunome.habittracker.viewmodel.HabitoViewModel
+
+@Composable
+fun ListaHabitosScreen(
+    modifier: Modifier = Modifier,
+    viewModel: HabitoViewModel,
+    aoAbrirDetalhe: (Int) -> Unit
+) {
+    Column(modifier = modifier.fillMaxSize()) {
+        Text(
+            "Seus hábitos de hoje",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(20.dp)
+        )
+
+        if (viewModel.habitos.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Nenhum hábito cadastrado ainda.", color = MaterialTheme.colorScheme.secondary)
+            }
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(viewModel.habitos, key = { it.id }) { habito ->
+                    CardHabito(
+                        habito = habito,
+                        aoClicar = { aoAbrirDetalhe(habito.id) },
+                        aoAlternar = { viewModel.alternarConclusao(habito.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardHabito(habito: Habito, aoClicar: () -> Unit, aoAlternar: () -> Unit) {
+    Card(
+        onClick = aoClicar,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(habito.emoji, fontSize = 20.sp)
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(habito.nome, fontWeight = FontWeight.SemiBold)
+                Text(habito.meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            }
+            IconButton(onClick = aoAlternar) {
+                Icon(
+                    imageVector = if (habito.concluidoHoje) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+                    contentDescription = if (habito.concluidoHoje) "Concluído hoje, tocar para desmarcar" else "Marcar como concluído",
+                    tint = if (habito.concluidoHoje) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                )
+            }
+        }
+    }
+}</code></pre>
+                </div>
+
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">userinterface/DetalheHabitoScreen.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.userinterface
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.seunome.habittracker.model.Habito
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DetalheHabitoScreen(habito: Habito?, aoVoltar: () -> Unit, aoAlternarConclusao: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(habito?.nome ?: "Hábito") },
+                navigationIcon = {
+                    IconButton(onClick = aoVoltar) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        if (habito == null) {
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Text("Hábito não encontrado.")
+            }
+            return@Scaffold
+        }
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(habito.emoji, fontSize = 64.sp)
+            Spacer(Modifier.height(16.dp))
+            Text(habito.nome, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text("Meta: ${habito.meta}", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(32.dp))
+            Button(onClick = aoAlternarConclusao) {
+                Text(if (habito.concluidoHoje) "Desmarcar conclusão" else "Marcar como concluído hoje")
+            }
+        }
+    }
+}</code></pre>
+                </div>
+
+                <div class="tip-box"><strong>Onde está o Type-Safety aqui, na prática:</strong> <code>DetalheHabitoScreen</code> recebe um <code>Habito?</code> já pronto — quem resolve o parâmetro da rota é o <code>AppNavigation</code>, no Passo 8, usando <code>backStackEntry.toRoute&lt;Rota.DetalheHabito&gt;()</code>. Esse método devolve diretamente um objeto <code>Rota.DetalheHabito</code> com <code>habitoId: Int</code> já no tipo certo — sem <code>Bundle</code>, sem <code>getString</code>, sem conversão manual.</div>
+                <div class="tip-box"><strong>Por que <code>habito: Habito?</code> (aceitando nulo):</strong> em teoria, um <code>habitoId</code> inválido nunca deveria chegar aqui — mas "em teoria" não é garantia. Tratar esse caso (com a tela de "Hábito não encontrado") é mais seguro do que assumir que o parâmetro sempre vai ser válido.</div>
+            </div>
+
+            <div class="step-box" id="passo-7">
+                <h3>Passo 7 — Painel Principal: Bottom Navigation Persistente <span class="step-progress">7 de 9</span></h3>
+                <p><strong>Local:</strong> pacote <code>userinterface</code></p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">userinterface/EstatisticasScreen.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.userinterface
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.seunome.habittracker.viewmodel.HabitoViewModel
+
+@Composable
+fun EstatisticasScreen(modifier: Modifier = Modifier, viewModel: HabitoViewModel) {
+    val total = viewModel.habitos.size
+    val concluidos = viewModel.habitos.count { it.concluidoHoje }
+
+    Column(
+        modifier = modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Progresso de hoje", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(24.dp))
+        Text("$concluidos de $total hábitos concluídos", style = MaterialTheme.typography.bodyLarge)
+        Spacer(Modifier.height(16.dp))
+        LinearProgressIndicator(
+            progress = { if (total == 0) 0f else concluidos.toFloat() / total },
+            modifier = Modifier.fillMaxWidth().height(10.dp),
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}</code></pre>
+                </div>
+
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">userinterface/PerfilScreen.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.userinterface
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.seunome.habittracker.viewmodel.HabitoViewModel
+
+@Composable
+fun PerfilScreen(modifier: Modifier = Modifier, viewModel: HabitoViewModel, aoSair: () -> Unit) {
+    Column(
+        modifier = modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Seu Perfil", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text("Continue firme nos seus hábitos!")
+        Spacer(Modifier.height(32.dp))
+        OutlinedButton(onClick = aoSair) {
+            Text("Sair da conta")
+        }
+    }
+}</code></pre>
+                </div>
+
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">userinterface/PainelPrincipal.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.userinterface
+
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import com.seunome.habittracker.model.Rota
+import com.seunome.habittracker.viewmodel.HabitoViewModel
+
+enum class AbaPrincipal { HABITOS, ESTATISTICAS, PERFIL }
+
+@Composable
+fun PainelPrincipal(
+    navController: NavHostController,
+    viewModel: HabitoViewModel,
+    abaAtual: AbaPrincipal
+) {
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = abaAtual == AbaPrincipal.HABITOS,
+                    onClick = { navegarParaAba(navController, Rota.ListaHabitos) },
+                    icon = { Icon(Icons.Filled.CheckCircle, contentDescription = "Hábitos") },
+                    label = { Text("Hábitos") }
+                )
+                NavigationBarItem(
+                    selected = abaAtual == AbaPrincipal.ESTATISTICAS,
+                    onClick = { navegarParaAba(navController, Rota.Estatisticas) },
+                    icon = { Icon(Icons.Filled.BarChart, contentDescription = "Estatísticas") },
+                    label = { Text("Estatísticas") }
+                )
+                NavigationBarItem(
+                    selected = abaAtual == AbaPrincipal.PERFIL,
+                    onClick = { navegarParaAba(navController, Rota.Perfil) },
+                    icon = { Icon(Icons.Filled.Person, contentDescription = "Perfil") },
+                    label = { Text("Perfil") }
+                )
+            }
+        }
+    ) { paddingValues ->
+        when (abaAtual) {
+            AbaPrincipal.HABITOS -> ListaHabitosScreen(
+                modifier = Modifier.padding(paddingValues),
+                viewModel = viewModel,
+                aoAbrirDetalhe = { id -> navController.navigate(Rota.DetalheHabito(id)) }
+            )
+            AbaPrincipal.ESTATISTICAS -> EstatisticasScreen(
+                modifier = Modifier.padding(paddingValues),
+                viewModel = viewModel
+            )
+            AbaPrincipal.PERFIL -> PerfilScreen(
+                modifier = Modifier.padding(paddingValues),
+                viewModel = viewModel,
+                aoSair = {
+                    viewModel.fazerLogout()
+                    navController.navigate(Rota.Login) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+    }
+}
+
+private fun navegarParaAba(navController: NavHostController, destino: Rota) {
+    navController.navigate(destino) {
+        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}</code></pre>
+                </div>
+
+                <div class="tip-box"><strong>As três linhas que fazem a Bottom Navigation persistir estado:</strong>
+                    <ul style="margin-top:0.5rem; margin-bottom:0;">
+                        <li><code>popUpTo(...) { saveState = true }</code> — antes de trocar de aba, salva o estado da aba atual (posição de rolagem, etc.) em vez de simplesmente descartá-la.</li>
+                        <li><code>launchSingleTop = true</code> — se você já está na aba "Hábitos" e toca nela de novo, não cria uma segunda cópia da mesma tela na pilha.</li>
+                        <li><code>restoreState = true</code> — ao voltar pra uma aba visitada antes, recupera o estado salvo em vez de recriar do zero.</li>
+                    </ul>
+                </div>
+                <div class="tip-box"><strong>Por que um <code>enum AbaPrincipal</code> em vez de usar <code>Rota</code> direto:</strong> <code>Rota</code> tem seis possibilidades (incluindo <code>Splash</code>, <code>Login</code>, <code>DetalheHabito</code>), mas o Painel Principal só precisa saber qual das <em>três abas</em> está selecionada. Um enum menor, dedicado só a essa decisão, deixa o <code>when</code> mais simples e sem a necessidade de tratar casos que nunca vão acontecer aqui.</div>
+            </div>
+
+            <div class="step-box" id="passo-8">
+                <h3>Passo 8 — AppNavigation: Ligando as Rotas <span class="step-progress">8 de 9</span></h3>
+                <p><strong>Local:</strong> pacote <code>userinterface</code> &nbsp;|&nbsp; <strong>Arquivo:</strong> <code>AppNavigation.kt</code></p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">userinterface/AppNavigation.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker.userinterface
+
+import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
+import com.seunome.habittracker.model.Rota
+import com.seunome.habittracker.viewmodel.HabitoViewModel
+
+@Composable
+fun AppNavigation() {
+    val navController = rememberNavController()
+    val viewModel: HabitoViewModel = viewModel()
+
+    NavHost(navController = navController, startDestination = Rota.Splash) {
+
+        composable&lt;Rota.Splash&gt; {
+            SplashScreen(
+                estaLogado = viewModel.estaLogado,
+                aoTerminarVerificacao = { logado ->
+                    val destino = if (logado) Rota.ListaHabitos else Rota.Login
+                    navController.navigate(destino) {
+                        popUpTo(Rota.Splash) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable&lt;Rota.Login&gt; {
+            LoginScreen(
+                aoLogar = {
+                    viewModel.fazerLogin()
+                    navController.navigate(Rota.ListaHabitos) {
+                        popUpTo(Rota.Login) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable&lt;Rota.ListaHabitos&gt; {
+            PainelPrincipal(navController, viewModel, AbaPrincipal.HABITOS)
+        }
+
+        composable&lt;Rota.Estatisticas&gt; {
+            PainelPrincipal(navController, viewModel, AbaPrincipal.ESTATISTICAS)
+        }
+
+        composable&lt;Rota.Perfil&gt; {
+            PainelPrincipal(navController, viewModel, AbaPrincipal.PERFIL)
+        }
+
+        composable&lt;Rota.DetalheHabito&gt; { backStackEntry ->
+            val rota: Rota.DetalheHabito = backStackEntry.toRoute()
+            DetalheHabitoScreen(
+                habito = viewModel.buscarHabito(rota.habitoId),
+                aoVoltar = { navController.popBackStack() },
+                aoAlternarConclusao = { viewModel.alternarConclusao(rota.habitoId) }
+            )
+        }
+    }
+}</code></pre>
+                </div>
+                <div class="tip-box"><strong>O papel deste arquivo:</strong> é o único lugar do app que sabe "qual tela vem depois de qual". Toda tela recebe apenas funções (<code>aoLogar</code>, <code>aoVoltar</code>...) — nenhuma delas importa <code>NavController</code> diretamente. Essa é a mesma separação de responsabilidades do MVVM aplicada à navegação: a tela não decide para onde ir, ela só relata o que o usuário fez.</div>
+                <div class="tip-box"><strong><code>popUpTo(Rota.Splash) { inclusive = true }</code>:</strong> depois de sair da Splash, ela precisa desaparecer da pilha por completo — senão o botão Voltar, a partir do Login ou da Lista de Hábitos, levaria de volta pra uma tela de carregamento que já cumpriu seu papel. O mesmo vale para <code>popUpTo(0) { inclusive = true }</code> no logout: apaga a pilha inteira, pra impedir que o botão Voltar, já na tela de Login, retorne para telas de quando o usuário ainda estava logado.</div>
+                <div class="tip-box"><strong><code>backStackEntry.toRoute&lt;Rota.DetalheHabito&gt;()</code>:</strong> essa função (da própria biblioteca Navigation) reconstrói o objeto <code>Rota.DetalheHabito</code> completo a partir da entrada da pilha — incluindo o <code>habitoId</code>, já como <code>Int</code>. É essa linha que substitui, com segurança de tipos, o antigo <code>getIntExtra("habitoId", -1)</code>.</div>
+            </div>
+
+            <div class="step-box" id="passo-9">
+                <h3>Passo 9 — MainActivity: Ligando Tudo <span class="step-progress">9 de 9</span></h3>
+                <p><strong>Local:</strong> raiz do pacote <code>com.seunome.habittracker</code> &nbsp;|&nbsp; <strong>Arquivo:</strong> <code>MainActivity.kt</code> (já existe — substitua o conteúdo)</p>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="dots"><span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span></span>
+                        <span class="fname">MainActivity.kt</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+                    </div>
+<pre><code>package com.seunome.habittracker
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
+import com.seunome.habittracker.userinterface.AppNavigation
+import com.seunome.habittracker.userinterface.HabitTrackerTheme
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            HabitTrackerTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    AppNavigation()
+                }
+            }
+        }
+    }
+}</code></pre>
+                </div>
+                <p style="margin-top:1.2rem;"><strong>▶ Rode o app agora.</strong> A Splash deve aparecer com a cor verde da nossa paleta, seguida da tela de Login (já que <code>estaLogado</code> começa em <code>false</code>). Depois de "entrar", o Painel Principal com as três abas deve funcionar, e tocar num hábito deve abrir a tela de detalhe correspondente.</p>
+            </div>
+
+            <div class="checklist">
+                <h3>Seu HabitTracker está pronto se…</h3>
+                <ul>
+                    <li>Ao abrir, o app mostra a Splash verde e depois vai direto para o Login.</li>
+                    <li>Tocar em "Entrar" leva para a Lista de Hábitos, sem voltar mais pro Login pelo botão Voltar.</li>
+                    <li>Tocar num hábito da lista abre a tela de detalhe <em>daquele</em> hábito específico — não sempre o primeiro.</li>
+                    <li>Trocar entre as abas Hábitos / Estatísticas / Perfil não reseta a rolagem da lista.</li>
+                    <li>A aba Estatísticas mostra a contagem certa de hábitos concluídos, refletindo o que foi marcado na lista.</li>
+                    <li>"Sair da conta" no Perfil volta para o Login, e o botão Voltar não retorna mais para as abas.</li>
+                    <li>Nenhuma tela usa <code>Color(0xFF...)</code> direto — tudo vem de <code>MaterialTheme.colorScheme</code>.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="erros" class="acc-fix">
+            <div class="file-tag">04_troubleshooting.md</div>
+            <h2>Erros Comuns e Como Resolver</h2>
+
+            <div class="erro-item">
+                <div class="erro-titulo">Configuration ':app:debugRuntimeClasspath' contains AndroidX dependencies, but the 'android.useAndroidX' property is not enabled</div>
+                <div class="erro-corpo">
+                    <p><strong>Causa:</strong> o <code>gradle.properties</code> do projeto não tem a linha que habilita o AndroidX — todas as bibliotecas do Compose e do Navigation são AndroidX.</p>
+                    <p><strong>Solução:</strong> em <strong>Gradle Scripts &gt; gradle.properties</strong>, adicione <code>android.useAndroidX=true</code>, clique em <strong>Sync Now</strong> e execute novamente.</p>
+                </div>
+            </div>
+
+            <div class="erro-item">
+                <div class="erro-titulo">Inconsistent JVM-target compatibility detected for tasks 'compileDebugJavaWithJavac' (11) and 'compileDebugKotlin' (21)</div>
+                <div class="erro-corpo">
+                    <p><strong>Causa:</strong> o Java está configurado para 11 (<code>compileOptions</code>), mas o Kotlin está compilando para 21, a versão do JDK usado pelo Gradle.</p>
+                    <p><strong>Solução:</strong> no <code>build.gradle.kts (Module :app)</code>, logo depois do bloco <code>android { }</code>, adicione <code>kotlin { compilerOptions { jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11 } }</code>, clique em <strong>Sync Now</strong> e rode de novo.</p>
+                </div>
+            </div>
+
+            <div class="erro-item">
+                <div class="erro-titulo">This material API is experimental and is likely to change or to be removed in the future</div>
+                <div class="erro-corpo">
+                    <p><strong>Causa:</strong> alguns componentes do Material 3 (como o <code>TopAppBar</code>) ainda são marcados como experimentais, e o Kotlin exige que você aceite isso de forma explícita.</p>
+                    <p><strong>Solução:</strong> adicione <code>import androidx.compose.material3.ExperimentalMaterial3Api</code> e coloque <code>@OptIn(ExperimentalMaterial3Api::class)</code> acima do <code>@Composable</code> da função que usa o componente (aqui, <code>DetalheHabitoScreen</code>). Dica: <strong>Alt+Enter</strong> sobre o erro oferece "Opt in for ExperimentalMaterial3Api".</p>
+                </div>
+            </div>
+
+            <div class="erro-item">
+                <div class="erro-titulo">App fecha ao abrir: ClassNotFoundException: Didn't find class "com.seunome.habittracker.MainActivity"</div>
+                <div class="erro-corpo">
+                    <p><strong>Causa:</strong> o <code>namespace</code> (e o <code>applicationId</code>) do <code>build.gradle.kts (Module :app)</code> ficou como <code>com.seunome.habittracker</code>, mas seu código está em outro pacote (ex.: <code>com.rclepf.habittracker</code>). O Android procura o <code>MainActivity</code> no pacote do <code>namespace</code> e não o encontra.</p>
+                    <p><strong>Solução:</strong> no <code>build.gradle.kts (Module :app)</code>, altere <code>namespace</code> e <code>applicationId</code> para o seu pacote real, clique em <strong>Sync Now</strong>, e rode de novo. Se o app antigo continuar instalado no emulador, desinstale-o antes. Como ler o Logcat: procure <code>FATAL EXCEPTION</code> e vá direto à última linha <code>Caused by:</code>.</p>
+                </div>
+            </div>
+
+            <div class="erro-item">
+                <div class="erro-titulo">Serializer for class 'DetalheHabito' is not found / Serialization plugin is not applied</div>
+                <div class="erro-corpo">
+                    <p><strong>Causa:</strong> falta o plugin <code>org.jetbrains.kotlin.plugin.serialization</code> no módulo, ou a classe da rota não está anotada com <code>@Serializable</code>.</p>
+                    <p><strong>Solução:</strong> confirme as quatro coisas juntas: a entrada <code>kotlin-serialization</code> existe no <code>[plugins]</code> do <code>libs.versions.toml</code>; a linha <code>alias(libs.plugins.kotlin.serialization) apply false</code> está no <code>plugins { }</code> do <code>build.gradle.kts (Project: HabitTracker)</code> da raiz; a linha <code>alias(libs.plugins.kotlin.serialization)</code> (sem <code>apply false</code>) está no <code>build.gradle.kts (Module :app)</code>; e cada <code>data object</code>/<code>data class</code> dentro de <code>Rota</code> tem <code>@Serializable</code> logo acima.</p>
+                </div>
+            </div>
+
+            <div class="erro-item">
+                <div class="erro-titulo">Unresolved reference: findStartDestination (ou NavGraph)</div>
+                <div class="erro-corpo">
+                    <p><strong>Causa:</strong> falta o import específico — essa função não vem junto com os imports comuns do Navigation Compose.</p>
+                    <p><strong>Solução:</strong> confirme a linha <code>import androidx.navigation.NavGraph.Companion.findStartDestination</code> no topo de <code>PainelPrincipal.kt</code>.</p>
+                </div>
+            </div>
+
+            <div class="erro-item">
+                <div class="erro-titulo">Unresolved reference: BarChart, RadioButtonUnchecked (ou outro ícone)</div>
+                <div class="erro-corpo">
+                    <p><strong>Causa:</strong> esses ícones não fazem parte do conjunto básico do Compose — eles vêm da biblioteca de ícones estendida.</p>
+                    <p><strong>Solução:</strong> confirme que <code>implementation(libs.androidx.compose.material.icons.extended)</code> está no <code>dependencies { }</code>, e que a entrada correspondente existe no <code>libs.versions.toml</code> (Passo 0.2).</p>
+                </div>
+            </div>
+
+            <div class="erro-item">
+                <div class="erro-titulo">Tocar em qualquer hábito sempre abre o detalhe do mesmo hábito</div>
+                <div class="erro-corpo">
+                    <p><strong>Causa:</strong> alguma cópia do código ficou com um <code>habitoId</code> fixo, em vez de usar o parâmetro recebido — geralmente um resquício de teste esquecido em <code>navController.navigate(Rota.DetalheHabito(1))</code> com valor fixo.</p>
+                    <p><strong>Solução:</strong> confirme que <code>aoAbrirDetalhe</code> em <code>PainelPrincipal.kt</code> usa <code>Rota.DetalheHabito(id)</code>, onde <code>id</code> vem do parâmetro da lambda — não um número digitado à mão.</p>
+                </div>
+            </div>
+
+            <div class="erro-item">
+                <div class="erro-titulo">Trocar de aba sempre volta a lista para o topo</div>
+                <div class="erro-corpo">
+                    <p><strong>Causa:</strong> falta uma das três configurações de <code>navegarParaAba()</code> — o mais comum é esquecer <code>restoreState = true</code>.</p>
+                    <p><strong>Solução:</strong> confira se as três linhas (<code>saveState</code>, <code>launchSingleTop</code>, <code>restoreState</code>) estão exatamente como no Passo 7. As três trabalham juntas — faltando uma, o comportamento quebra de formas sutis.</p>
+                </div>
+            </div>
+
+            <div class="erro-item">
+                <div class="erro-titulo">Depois de sair da conta e entrar de novo, o botão Voltar leva pra tela de antes do logout</div>
+                <div class="erro-corpo">
+                    <p><strong>Causa:</strong> o <code>popUpTo(0) { inclusive = true }</code> não está sendo aplicado corretamente na ação de logout.</p>
+                    <p><strong>Solução:</strong> confirme que a navegação para <code>Rota.Login</code> dentro de <code>aoSair</code> (em <code>PainelPrincipal.kt</code>) inclui esse bloco. <code>popUpTo(0)</code> significa "suba até a raiz da pilha de navegação e apague tudo pelo caminho".</p>
+                </div>
+            </div>
+
+            <div class="erro-item">
+                <div class="erro-titulo">O estado de login "esquece" sozinho ao girar a tela</div>
+                <div class="erro-corpo">
+                    <p><strong>Causa:</strong> alguma tela está criando sua própria instância de <code>HabitoViewModel</code> chamando <code>viewModel()</code> localmente, em vez de receber a instância única criada em <code>AppNavigation</code>.</p>
+                    <p><strong>Solução:</strong> confirme que <code>viewModel()</code> só é chamado uma vez, no topo de <code>AppNavigation.kt</code>, e que toda tela recebe <code>viewModel</code> como parâmetro.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="atividade-cta" class="cta-section">
+            <div class="terminal-window">
+                <div class="terminal-titlebar">
+                    <span class="dot d-nav"></span><span class="dot d-fix"></span><span class="dot d-design"></span>
+                    <span class="filename">~/proxima-missao</span>
+                </div>
+                <div class="terminal-body">
+                    <p class="term-line"><span class="term-prompt">$</span> cat proxima_missao.md</p>
+                    <p class="term-output">Vocês construíram os quatro padrões de navegação no HabitTracker. Agora é a vez de aplicar o mesmo ecossistema — navegação linear, parâmetros type-safe, bottom navigation e fluxo condicional — num app com um tema escolhido por vocês.</p>
+                    <p class="term-line"><span class="term-prompt">$</span></p>
+                    <a class="term-cta" href="Atividade_Navegacao_HabitTracker.pdf" download>./baixar-atividade.pdf ↵</a>
+                    <p class="cta-meta">O PDF contém a missão completa, os requisitos obrigatórios e a rubrica de correção.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer>
+        Desenvolvimento Android Moderno &copy; 2026 · Navigation Compose + Type-Safety + Design System
+    </footer>
+
+    <script>
+        function copyCode(btn) {
+            const pre = btn.closest('.code-container').querySelector('pre');
+            navigator.clipboard.writeText(pre.innerText).then(() => {
+                const original = btn.textContent;
+                btn.textContent = 'Copiado!';
+                setTimeout(() => { btn.textContent = original; }, 1500);
+            });
+        }
+        const navToggle = document.getElementById('navToggle');
+        const navLinks = document.getElementById('navLinks');
+        navToggle.addEventListener('click', () => {
+            const isOpen = navLinks.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', isOpen);
+        });
+        const sections = document.querySelectorAll('main > section');
+        const links = document.querySelectorAll('.step-nav-link');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.getAttribute('id');
+                    links.forEach(link => {
+                        link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+                    });
+                }
+            });
+        }, { rootMargin: '-45% 0px -50% 0px' });
+        sections.forEach(sec => observer.observe(sec));
+    </script>
+
+</body>
+</html>
